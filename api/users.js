@@ -1,16 +1,21 @@
 const express = require('express');
-const router = express.Router();
-// took from juicebox
+const usersRouter = express.Router();
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const usersRouter = require('../../FitnessTracker/api/users');
-const { getAllUsers, createUser, getUserByUsername } = require('../db.users')
-const {getPublicRoutinesByUser} = require('../db.routines')
+// const { token } = require("morgan");
+const { JWT_SECRET } = process.env;
 
+// const token = require('bcrypt');
+// const usersRouter = require('../../FitnessTracker/api/users');
+const { createUser, getUserByUsername, getUserById, getPublicRoutinesByUser } = require('../db.users');
+// const {getPublicRoutinesByUser} = require('../db.routines')
 
+usersRouter.use((feq, res, next )=> {
+  console.log("A request has been made to /users");
+
+  next();
+})
 
 // POST /api/users/login
-//from juicebox; no hashed password
 usersRouter.post('/login', async (req, res, next) => {
   const { username, password } = req.body;
 
@@ -20,15 +25,15 @@ usersRouter.post('/login', async (req, res, next) => {
       message: "Please suppy both a username and password"
     });
   }
-  //juicebox put in id: 1 and username: 'albert' not sure what we need for this
-  const token = jwt.sign({ id: 1, username: 'albert' }, process.env.JWT_SECRET);
-
+  
   try {
     const user = await getUserByUsername(username, password);
-    const SALT_COUNT = 10;
-    const hashedPassword = await bcrypt.hash(password, SALT_COUNT);
+    const token = jwt.sign(user, process.env.JWT_SECRET);
 
-    if (!user && !user.password == hashedPassword) {
+    // const SALT_COUNT = 10;
+    // const hashedPassword = await bcrypt.hash(password, SALT_COUNT);
+
+    if (!user) {
       res.send({
         name: 'IncorrectCredentialsError',
         message: 'Username or password is incorrect'
@@ -36,40 +41,41 @@ usersRouter.post('/login', async (req, res, next) => {
 
     } else {
       next({
-        message: "you're logged in!", token
+        message: "you're logged in!", 
+        token: token
 
       });
     }
-  } catch (error) {
-    console.log(error);
-    next(error);
+  } catch ({ name, message }) {
+    ({ name, message });
   }
 });
 
 // POST /api/users/register
-// from juicebox; did not hash password, took out name and location; added password.length if statement
 usersRouter.post('/register', async (req, res, next) => {
   const { username, password } = req.body;
 
   try {
     const _user = await getUserByUsername(username);
-    const SALT_COUNT = 10;
-    const hashedPassword = await bcrypt.hash(password, SALT_COUNT);
+    // const SALT_COUNT = 10;
+    // const hashedPassword = await bcrypt.hash(password, SALT_COUNT);
 
     if (_user) {
-      next({
+      throw new Error({
         name: 'UserExistsError',
         message: 'A user by that username already exists'
-      });
+      })
     }
 
-    const user = await createUser({username, hashedPassword});
-
+    
     if (password.length < 8) {
-      next({
+      throw new Error({
+        name: "PasswordLengthError",
         password: "Password must be at least 8 characters"
-      });
+      })
     }
+
+    const user = await createUser({username, password});
 
     const token = jwt.sign({
       id: user.id,
@@ -80,7 +86,8 @@ usersRouter.post('/register', async (req, res, next) => {
 
     res.send({
       message: "thank you for signing up",
-      token
+      user,
+      token,
     });
   } catch ({ name, message }) {
     next({ name, message })
@@ -92,41 +99,42 @@ usersRouter.post('/register', async (req, res, next) => {
 
 
 // GET /api/users/me
-// from juicebox usersRouter.get to start. Created const userData... myself
-usersRouter.get('/users', async (req, res, next) => {
-  const { username } = req.params;
+usersRouter.get('/me', async (req, res, next) => {
+  const prefix = "Bearer";
+  const auth = req.header("Authorization");
+  // const { username } = req.params;
   try {
-    const token = jwt.sign({username}, process.env.JWT_SECRET, {expiresIn:'1w'});
-    const currentUser = await getAllUsers({username,token});
-      if(!token) {
-        next({
-          message: "Invalid credentials"
-        })
-        res.send({currentUser})
-      } 
-    } catch (error) {
-        next(error);
+    if(!auth) {
+      res.sendStatus(401);
+      } else if (auth.startsWith(prefix)) {
+        const token = auth.slice(prefix.length)
+        const { id } = jwt.verify(token, JWT_SECRET);
+
+        if (id) {
+          req.user = await getUserById(id);
+          res.send(req.user);
+        }
       }
+    } catch (error) {
+      next(error);
+    }
 });
   
 
 // GET /api/users/:username/routines
-// used usersRouter.get from juicebox users.js as a start
 usersRouter.get('/:username/routines', async (req, res, next) => {
   const {username} = req.params;
+
   try{
-    const userRoutines = await getPublicRoutinesByUser(username);
-    if(!username) {
-      next({
-        username: "username does not exist",
-        routines: "public routines do not exist",
-        message: "There are no public routines for this user"
-      });
-      res.send(userRoutines)
+    const routine = await getPublicRoutinesByUser( {username} );
+    if(routine) {
+      res.send(routine);
+    } else {
+      next();
     }
-  } catch ({message}) {
-    return (username)
+  } catch (error) {
+    next(error);
   }
 });
 
-module.exports = router;
+module.exports = usersRouter;

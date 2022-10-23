@@ -1,4 +1,4 @@
-function requireUser(req, res, next) {
+const requireUser = (req, res, next) => {
     if (!req.user) {
       res.status(401)
       next({

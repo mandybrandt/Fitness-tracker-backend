@@ -69,7 +69,6 @@ async function getPublicRoutinesByUser({ username }) {
     AND "isPublic"=true
     `, [username]);
 
-
     return attachActivitiesToRoutines(routines);
   } catch (error) {
     console.log(error)
