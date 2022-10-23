@@ -1,11 +1,8 @@
 const client = require("./client")
 
-// database functions
-
-
 async function getAllActivities() {
   try {
-    const { rows:activities } = await client.query(`
+    const { rows: activities } = await client.query(`
     SELECT *
     FROM activities
 `);
@@ -44,7 +41,7 @@ async function getActivityByName(name) {
     throw error;
   }
 }
-// select and return an array of all activities
+
 async function attachActivitiesToRoutines(routines) {
   const routineArray = [...routines];
   const attach = routines.map((routine) => routine.id);
@@ -53,13 +50,13 @@ async function attachActivitiesToRoutines(routines) {
   }
 
   try {
-    const { rows: [activities] } = await client.query(`
+    const { rows: activities } = await client.query(`
     SELECT activities.*, routine_activities.duration, routine_activities.count,
-    routine_activities.id AS routineActivityId, routine_activities.routineId
+    routine_activities.id AS "routineActivityId", routine_activities."routineId"
     FROM activities
-    JOIN routine_activities ON routine_activities.activityId = activities.id
-    WHERE routine_activities.routineId IN (${attach});
-    `, routines);
+    JOIN routine_activities ON routine_activities."activityId" = activities.id
+    WHERE routine_activities."routineId" IN (${attach.map((routineId, index) => ('$' + (index + 1))).join(',')});
+    `, attach);
     for (const routine of routineArray) {
       const addActivities = activities.filter((activity) => routine.id === activity.routineId);
       routine.activities = addActivities;
@@ -72,7 +69,7 @@ async function attachActivitiesToRoutines(routines) {
   }
 }
 
-// return the new activity
+
 async function createActivity({ name, description }) {
   try {
     const { rows: [activity] } = await client.query(`
@@ -89,22 +86,19 @@ async function createActivity({ name, description }) {
   }
 }
 
-// don’t try to update the id
-// do update the name and description
-// return the updated activity
 async function updateActivity({ id, ...fields }) {
-  const setString = Object.keys(fields).map((key,index)=> `"${key}"=$${index + 1}`).join(",");
+  const setString = Object.keys(fields).map((key, index) => `"${key}"=$${index + 1}`).join(",");
   try {
-    if(setString.length > 0) {
+    if (setString.length > 0) {
       const { rows } = await client.query(
         `UPDATE activities
         SET ${setString}
         WHERE id = ${id}
         RETURNING *;
       `, Object.values(fields));
-    return rows[0];
+      return rows[0];
     }
-    
+
   } catch (error) {
     console.log(error);
     throw error;
