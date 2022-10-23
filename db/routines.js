@@ -136,9 +136,9 @@ async function updateRoutine({ id, ...fields }) {
       WHERE id=${id}
       RETURNING *;
       `, Object.values(fields));
-    }
 
     return routine;
+    }
 
   } catch (error) {
     console.log(error);
@@ -149,8 +149,8 @@ async function destroyRoutine(id) {
   try {
     await client.query(`
     DELETE FROM routine_activities
-    WHERE "routineId"=$1;
-    RETURNING *
+    WHERE "routineId"=$1
+    RETURNING *;
     `, [id]);
     const { rows: [routine] } = await client.query(`
     DELETE FROM routines
