@@ -1,7 +1,8 @@
-const requireUser = (req, res, next) => {
+function requireUser(req, res, next) {
     if (!req.user) {
       res.status(401)
-      next({
+      res.send({
+        error: "User not logged in",
         name: "MissingUserError",
         message: "You must be logged in to perform this action"
       });

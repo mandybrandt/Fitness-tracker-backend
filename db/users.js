@@ -24,7 +24,7 @@ async function createUser({ username, password }) {
 }
 
 
-async function getUser({ username, password }) {
+async function getUser( {username, password} ) {
   if (!username || !password) return
   try {
     const user = await getUserByUsername(username);
@@ -34,7 +34,7 @@ async function getUser({ username, password }) {
     if (passwordsMatch) {
       delete user.password;
       return user;
-    } else {
+    }  else {
       return null;
     }
 
@@ -52,7 +52,7 @@ async function getUserById(id) {
     WHERE id = ${id}
     `);
 
-    if (!user) {
+    if(!user) {
       return null
     } else {
       delete user.password;
@@ -63,7 +63,7 @@ async function getUserById(id) {
     console.log("Error getting user by id");
   }
 }
-
+  
 
 async function getUserByUsername(username) {
   try {

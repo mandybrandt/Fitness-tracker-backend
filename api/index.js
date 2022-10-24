@@ -1,70 +1,70 @@
 const express = require('express');
-const { getUserById } = require("../db");
-const activitiesRouter = require("./activities");
-const jwt = require("jsonwebtoken");
-const { JWT_SECRET = 'neverTell' } = process.env;
-const healthRouter = require("./health");
-const routinesRouter = require("./routines");
-const usersRouter = require("./users");
-const routine_activitiesRouter = require("./routine_activities");
-const apiRouter = express.Router();
-const cors = require('cors');
-const app = express()
+const router = express.Router();
+const jwt = require('jsonwebtoken');
+const { getUserById } = require('../db');
+const { JWT_SECRET = 'neverTell'} = process.env;
+const routineActivitiesRouter = require('./routineActivities');
+const routinesRouter = require('./routines');
+const activitiesRouter = require('./activities');
+const usersRouter = require('./users');
 
-app.use(cors())
-app.get('/products/:id', function (req, res,) {
-  res.json({ msg: 'This is CORS-enabled for all origins!' })
-})
-app.listen(80, function () {
-  console.log('CORS-enabled web server listening on port 80')
-})
-// GET /api/health
-apiRouter.get('/health', async () => {
-    console.log('server is running on port 80')
+router.get('/health', async (req, res, next) => {
+    res.status(200).json({
+      uptime: process.uptime(),
+      message: 'All is well',
+      timestamp: Date.now()
+    });
+    next()
 });
 
-apiRouter.use(async (req, res, next) => {
+router.use(async (req, res, next) => {
   const prefix = 'Bearer';
   const auth = req.header('Authorization');
-
-  try {
-    if (!auth) {
-      next();
-    } else if (auth.startsWith(prefix)) {
-      const token = auth.slice(prefix.length);
-
-      try {
-        const { id } = jwt.verify(token, JWT_SECRET);
-
-        if (id) {
-          req.user = await getUserById(id);
-          next();
-        }
-      } catch ({ name, message }) {
-        next({
-          name: "AuthorizationHeaderError",
-          message: `Authorization token must start with ${prefix}`
-        });
+  
+  if (!auth) {
+    next();
+  } else if (auth.startsWith(prefix)) {
+    const token = auth.slice(prefix.length);
+    try {
+      const newToken = jwt.verify(token, JWT_SECRET);
+      const id = newToken && newToken.id
+      if (id) {
+        req.user = await getUserById(id);
+        next();
       }
+    } catch (error) {
+      next(error);
     }
-  } catch ({ name, message }) {
+  } else {
     next({
-      name: "AuthorizationHeaderError",
-      message: `Authorization token must start with ${prefix}`
-    })
+      name: 'AuthorizationHeaderError',
+      message: `Authorization token must start with ${ prefix }`
+    });
   }
 });
 
-apiRouter.use("/health", healthRouter);
+router.use((req, res, next) => {
+  if (req.user) {
+    console.log("req.user W");
+  }
+  next();
+});
+
 // ROUTER: /api/users
-apiRouter.use('/users', usersRouter);
-
+router.use('/users', usersRouter);
 // ROUTER: /api/activities
-apiRouter.use('/activities', activitiesRouter);
-
+router.use('/activities', activitiesRouter);
 // ROUTER: /api/routines
-apiRouter.use('/routines', routinesRouter);
-
+router.use('/routines', routinesRouter);
 // ROUTER: /api/routine_activities
-apiRouter.use('/routine_activities', routine_activitiesRouter);
-module.exports = apiRouter;
+router.use('/routine_activities', routineActivitiesRouter);
+
+router.get('*', function(req, res){
+    res.status(404);
+    res.send({
+        message: "404 page not found"
+    })
+})
+
+
+module.exports = router;
